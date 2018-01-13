@@ -6,8 +6,11 @@ const io = require('socket.io')(server, {
 });
 
 io.on('connection', socket => {
-  socket.on('message', payload => {
-    socket.broadcast.emit('message', payload);
+  socket.on('chat', payload => {
+    socket.broadcast.emit('chat', payload);
+  });
+  socket.on('game', payload => {
+    socket.broadcast.emit('game', payload);
   });
 });
 
