@@ -5,13 +5,18 @@ const io = require('socket.io')(server, {
   serveClient: false,
 });
 
-io.on('connection', socket => {
-  socket.on('chat', payload => {
-    socket.broadcast.emit('chat', payload);
+function createGame(gameId) {
+  const nsp = io.of(`/games/${gameId}`);
+  nsp.on('connection', socket => {
+    socket.on('chat', payload => {
+      socket.broadcast.emit('chat', payload);
+    });
+    socket.on('game', payload => {
+      socket.broadcast.emit('game', payload);
+    });
   });
-  socket.on('game', payload => {
-    socket.broadcast.emit('game', payload);
-  });
-});
+}
+
+createGame('1');
 
 server.listen(process.env.PORT);
