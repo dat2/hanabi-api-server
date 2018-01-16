@@ -1,8 +1,20 @@
-const server = require('http').createServer();
+const express = require('express');
+const socketIo = require('socket.io');
+const http = require('http');
+const uuidv4 = require('uuid/v4');
 
-const io = require('socket.io')(server, {
+const app = express();
+const server = http.createServer(app);
+
+const io = socketIo(server, {
   path: '/ws',
   serveClient: false,
+});
+
+app.post('/api/games', function(req, res) {
+  const newGameId = uuidv4();
+  createGame(newGameId);
+  res.json({ id: newGameId });
 });
 
 function createGame(gameId) {
@@ -16,7 +28,5 @@ function createGame(gameId) {
     });
   });
 }
-
-createGame('1');
 
 server.listen(process.env.PORT);
