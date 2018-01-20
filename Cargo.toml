@@ -1,0 +1,12 @@
+[package]
+authors = ["Nicholas Dujay <nickdujay@gmail.com>"]
+name = "hanabi-server"
+version = "0.1.0"
+
+[dependencies]
+rocket = "0.3.6"
+rocket_codegen = "0.3.6"
+rocket_contrib = "0.3.6"
+serde = "1.0.27"
+serde_derive = "1.0.27"
+ws = "0.7.3"
