@@ -88,7 +88,7 @@ impl Fairing for Cors {
 }
 
 fn main() {
-  let cors_origin = env::var("CLIENT_SERVER_URL").unwrap_or("http://localhost:3000".to_string());
+  let cors_origin = env::var("CLIENT_SERVER_ORIGIN").unwrap_or("http://localhost:3000".to_string());
 
   rocket::ignite()
     .attach(Cors::new(cors_origin))
