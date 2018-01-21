@@ -7,6 +7,13 @@ version = "0.1.0"
 rocket = "0.3.6"
 rocket_codegen = "0.3.6"
 rocket_contrib = "0.3.6"
+rocket_cors = "0.2.1"
 serde = "1.0.27"
 serde_derive = "1.0.27"
-uuid = { version = "0.5.1", features = ["serde", "v4"] }
+
+[dependencies.uuid]
+features = [
+    "serde",
+    "v4",
+]
+version = "0.5.1"
