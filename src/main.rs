@@ -51,6 +51,7 @@ impl GamesState {
 /* api */
 #[derive(Debug, Serialize)]
 struct CreateGameResponse {
+  creator: String,
   id: Uuid,
 }
 
@@ -58,9 +59,10 @@ struct CreateGameResponse {
 fn create_game(games_list: State<GamesState>, cookies: Cookies) -> Json<CreateGameResponse> {
   let creator = cookies.get("name")
     .map(|cookie| cookie.value())
-    .unwrap_or("anonymous");
-  let uuid = games_list.create_new_game(creator.to_owned());
-  Json(CreateGameResponse { id: uuid })
+    .unwrap_or("anonymous")
+    .to_owned();
+  let uuid = games_list.create_new_game(creator.clone());
+  Json(CreateGameResponse { creator: creator, id: uuid })
 }
 
 #[derive(Debug, Deserialize)]
