@@ -4,12 +4,13 @@
 extern crate rocket;
 extern crate rocket_contrib;
 extern crate serde;
-#[macro_use] extern crate serde_derive;
+#[macro_use]
+extern crate serde_derive;
 extern crate uuid;
 
 use rocket::{Request, Response, State};
 use rocket::fairing::{Fairing, Info, Kind};
-use rocket::http::{Header, ContentType, Method};
+use rocket::http::{ContentType, Header, Method};
 use rocket_contrib::Json;
 use std::collections::HashMap;
 use std::env;
@@ -22,12 +23,14 @@ struct GameState;
 
 #[derive(Debug)]
 struct GamesState {
-  games: RwLock<HashMap<Uuid, GameState>>
+  games: RwLock<HashMap<Uuid, GameState>>,
 }
 
 impl GamesState {
   fn new() -> GamesState {
-    GamesState { games: RwLock::new(HashMap::new()) }
+    GamesState {
+      games: RwLock::new(HashMap::new()),
+    }
   }
 
   fn create_new_game(&self) -> Uuid {
@@ -43,7 +46,7 @@ impl GamesState {
 
 #[derive(Debug, Serialize)]
 struct CreateGameResponse {
-  id: Uuid
+  id: Uuid,
 }
 
 #[post("/games")]
@@ -53,14 +56,12 @@ fn create_game(games_list: State<GamesState>) -> Json<CreateGameResponse> {
 }
 
 struct Cors {
-  origin: String
+  origin: String,
 }
 
 impl Cors {
   fn new(origin: String) -> Cors {
-    Cors {
-      origin: origin
-    }
+    Cors { origin: origin }
   }
 }
 
@@ -68,14 +69,20 @@ impl Fairing for Cors {
   fn info(&self) -> Info {
     Info {
       name: "Add Cors headers to requests",
-      kind: Kind::Response
+      kind: Kind::Response,
     }
   }
 
   fn on_response(&self, request: &Request, response: &mut Response) {
     if request.method() == Method::Options || response.content_type() == Some(ContentType::JSON) {
-      response.set_header(Header::new("Access-Control-Allow-Origin", self.origin.clone()));
-      response.set_header(Header::new("Access-Control-Allow-Methods", "POST, GET, OPTIONS"));
+      response.set_header(Header::new(
+        "Access-Control-Allow-Origin",
+        self.origin.clone(),
+      ));
+      response.set_header(Header::new(
+        "Access-Control-Allow-Methods",
+        "POST, GET, OPTIONS",
+      ));
       response.set_header(Header::new("Access-Control-Allow-Headers", "Content-Type"));
       response.set_header(Header::new("Access-Control-Allow-Credentials", "true"));
     }
