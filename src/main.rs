@@ -113,8 +113,6 @@ struct CreateGameResponse {
 #[post("/games")]
 fn create_game(games_list: State<GamesState>, player: Player) -> Json<CreateGameResponse> {
   let game_id = games_list.create_new_game(player.name.clone());
-  games_list.add_player_to_game(&game_id, player.clone());
-  println!("{:?}", games_list);
   Json(CreateGameResponse {
     creator: player.name.clone(),
     id: game_id,
@@ -124,7 +122,6 @@ fn create_game(games_list: State<GamesState>, player: Player) -> Json<CreateGame
 #[post("/games/<id>/join")]
 fn join_game(id: UUID, games_list: State<GamesState>, player: Player) -> NoContent {
   games_list.add_player_to_game(&*id, player);
-  println!("{:?}", games_list);
   NoContent
 }
 
