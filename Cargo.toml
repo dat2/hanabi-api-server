@@ -1,6 +1,6 @@
 [package]
 authors = ["Nicholas Dujay <nickdujay@gmail.com>"]
-name = "hanabi-server"
+name = "hanabi-api-server"
 version = "0.1.0"
 
 [dependencies]
