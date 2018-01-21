@@ -9,20 +9,52 @@ extern crate serde;
 extern crate serde_derive;
 extern crate uuid;
 
-use rocket::State;
+use rocket::{Request, State, Outcome};
 use rocket::http::{Cookie, Cookies, Method};
+use rocket::request::{self, FromRequest};
 use rocket::response::status::NoContent;
-use rocket_contrib::Json;
-use rocket_cors::{AllowedOrigins, AllowedHeaders};
+use rocket_contrib::{Json, UUID};
+use rocket_cors::{AllowedHeaders, AllowedOrigins};
 use std::collections::HashMap;
 use std::env;
 use std::sync::RwLock;
 use uuid::Uuid;
 
+/* request guards */
+#[derive(Clone, Debug)]
+struct Player {
+  name: String
+}
+
+impl<'a, 'r> FromRequest<'a, 'r> for Player {
+  type Error = ();
+
+  fn from_request(request: &'a Request<'r>) -> request::Outcome<Player, ()> {
+    let cookies = request.guard::<Cookies>()?;
+
+    let name = cookies
+      .get("name")
+      .map(|cookie| cookie.value())
+      .unwrap_or("anonymous")
+      .to_owned();
+
+    Outcome::Success(Player {
+      name: name
+    })
+  }
+}
+
 /* State */
 #[derive(Debug)]
 struct GameState {
-  creator: String
+  creator: String,
+  players: Vec<Player>
+}
+
+impl GameState {
+  fn add_player(&mut self, player: Player) {
+    self.players.push(player);
+  }
 }
 
 #[derive(Debug)]
@@ -39,16 +71,39 @@ impl GamesState {
 
   fn create_new_game(&self, creator: String) -> Uuid {
     let uuid = Uuid::new_v4();
-    let state = GameState { creator: creator };
+    let state = GameState { creator: creator, players: Vec::new() };
     {
       let mut w = self.games.write().unwrap();
       w.insert(uuid, state);
     }
     uuid
   }
+
+  fn add_player_to_game(&self, game_id: &Uuid, player: Player) {
+    {
+      let mut w = self.games.write().unwrap();
+      if let Some(game) = w.get_mut(game_id) {
+        game.add_player(player);
+      }
+    }
+  }
 }
 
 /* api */
+#[derive(Debug, Deserialize)]
+struct SetNameRequest {
+  name: String,
+}
+
+#[post("/name", format = "application/json", data = "<set_name>")]
+fn set_name(set_name: Json<SetNameRequest>, mut cookies: Cookies) -> NoContent {
+  let cookie = Cookie::build("name", set_name.name.clone())
+    .path("/")
+    .finish();
+  cookies.add(cookie);
+  NoContent
+}
+
 #[derive(Debug, Serialize)]
 struct CreateGameResponse {
   creator: String,
@@ -56,42 +111,42 @@ struct CreateGameResponse {
 }
 
 #[post("/games")]
-fn create_game(games_list: State<GamesState>, cookies: Cookies) -> Json<CreateGameResponse> {
-  let creator = cookies.get("name")
-    .map(|cookie| cookie.value())
-    .unwrap_or("anonymous")
-    .to_owned();
-  let uuid = games_list.create_new_game(creator.clone());
-  Json(CreateGameResponse { creator: creator, id: uuid })
+fn create_game(games_list: State<GamesState>, player: Player) -> Json<CreateGameResponse> {
+  let game_id = games_list.create_new_game(player.name.clone());
+  games_list.add_player_to_game(&game_id, player.clone());
+  println!("{:?}", games_list);
+  Json(CreateGameResponse {
+    creator: player.name.clone(),
+    id: game_id,
+  })
 }
 
-#[derive(Debug, Deserialize)]
-struct SetNameRequest {
-  name: String
-}
-
-#[post("/name", format = "application/json", data = "<set_name>")]
-fn set_name(set_name: Json<SetNameRequest>, mut cookies: Cookies) -> NoContent {
-  cookies.add(Cookie::new("name", set_name.name.clone()));
+#[post("/games/<id>/join")]
+fn join_game(id: UUID, games_list: State<GamesState>, player: Player) -> NoContent {
+  games_list.add_player_to_game(&*id, player);
+  println!("{:?}", games_list);
   NoContent
 }
 
 fn main() {
-  let client_server_origin = env::var("CLIENT_SERVER_ORIGIN").unwrap_or("http://localhost:3000".to_string());
+  let client_server_origin =
+    env::var("CLIENT_SERVER_ORIGIN").unwrap_or("http://localhost:3000".to_string());
 
   let (allowed_origins, _) = AllowedOrigins::some(&[&client_server_origin]);
   let fairing = rocket_cors::Cors {
     allowed_origins: allowed_origins,
-    allowed_methods: vec![Method::Get, Method::Post, Method::Options].into_iter().map(From::from).collect(),
+    allowed_methods: vec![Method::Get, Method::Post, Method::Options]
+      .into_iter()
+      .map(From::from)
+      .collect(),
     allowed_headers: AllowedHeaders::some(&["Content-Type"]),
     allow_credentials: true,
     ..Default::default()
   };
 
-
   rocket::ignite()
     .attach(fairing)
-    .mount("/api", routes![set_name, create_game])
+    .mount("/api", routes![set_name, create_game, join_game])
     .manage(GamesState::new())
     .launch();
 }
