@@ -9,7 +9,7 @@ extern crate serde;
 extern crate serde_derive;
 extern crate uuid;
 
-use rocket::{Request, State, Outcome};
+use rocket::{Outcome, Request, State};
 use rocket::http::{Cookie, Cookies, Method};
 use rocket::request::{self, FromRequest};
 use rocket::response::status::NoContent;
@@ -23,7 +23,7 @@ use uuid::Uuid;
 /* request guards */
 #[derive(Clone, Debug, Serialize)]
 struct Player {
-  name: String
+  name: String,
 }
 
 impl<'a, 'r> FromRequest<'a, 'r> for Player {
@@ -38,9 +38,7 @@ impl<'a, 'r> FromRequest<'a, 'r> for Player {
       .unwrap_or("anonymous")
       .to_owned();
 
-    Outcome::Success(Player {
-      name: name
-    })
+    Outcome::Success(Player { name: name })
   }
 }
 
@@ -52,7 +50,8 @@ struct Game {
   players: Vec<Player>,
   name: String,
   max_players: usize,
-  password: Option<String>
+  password: Option<String>,
+  unlisted: bool,
 }
 
 impl Game {
@@ -73,7 +72,19 @@ impl GamesState {
     }
   }
 
-  fn create_new_game(&self, creator: String, name: String, max_players: usize, password: Option<String>) -> Game {
+  fn get_games(&self) -> Vec<Game> {
+    let r = self.games.read().unwrap();
+    r.values().filter(|g| !g.unlisted).cloned().collect()
+  }
+
+  fn create_new_game(
+    &self,
+    creator: String,
+    name: String,
+    max_players: usize,
+    password: Option<String>,
+    unlisted: bool,
+  ) -> Game {
     let uuid = Uuid::new_v4();
     let game = Game {
       id: uuid.clone(),
@@ -81,7 +92,8 @@ impl GamesState {
       players: Vec::new(),
       name: name,
       max_players: max_players,
-      password: password
+      password: password,
+      unlisted: unlisted,
     };
     {
       let mut w = self.games.write().unwrap();
@@ -115,26 +127,44 @@ fn set_name(set_name: Json<SetNameRequest>, mut cookies: Cookies) -> NoContent {
   NoContent
 }
 
+#[derive(Debug, Serialize)]
+struct GetGamesResponse {
+  games: Vec<Game>
+}
+
+#[get("/games", format = "application/json")]
+fn get_games(games_list: State<GamesState>) -> Json<GetGamesResponse> {
+  Json(GetGamesResponse {
+    games: games_list.get_games()
+  })
+}
+
 #[derive(Debug, Deserialize)]
 struct CreateGameRequest {
   name: String,
   players: usize,
-  password: Option<String>
+  password: Option<String>,
+  unlisted: bool
 }
 
 #[derive(Debug, Serialize)]
 struct CreateGameResponse {
   creator: Player,
-  game: Game
+  game: Game,
 }
 
 #[post("/games", format = "application/json", data = "<game_options>")]
-fn create_game(games_list: State<GamesState>, player: Player, game_options: Json<CreateGameRequest>) -> Json<CreateGameResponse> {
+fn create_game(
+  games_list: State<GamesState>,
+  player: Player,
+  game_options: Json<CreateGameRequest>,
+) -> Json<CreateGameResponse> {
   let game = games_list.create_new_game(
     player.name.clone(),
     game_options.name.clone(),
     game_options.players,
-    game_options.password.clone()
+    game_options.password.clone(),
+    game_options.unlisted
   );
   Json(CreateGameResponse {
     creator: player,
@@ -166,7 +196,7 @@ fn main() {
 
   rocket::ignite()
     .attach(fairing)
-    .mount("/api", routes![set_name, create_game, join_game])
+    .mount("/api", routes![set_name, get_games, create_game, join_game])
     .manage(GamesState::new())
     .launch();
 }
